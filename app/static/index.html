@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok Imagine Video Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>Grok Imagine Video Generator</h1>
+        <div class="balance" id="balance"></div>
+    </header>
+    <main class="two-column">
+        <section class="controls-panel">
+            <div class="upload-zone" id="dropZone">
+                <div class="upload-placeholder" id="uploadPlaceholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p>Drag &amp; drop an image here, or click to select</p>
+                </div>
+                <img id="imagePreview" hidden>
+                <input type="file" id="imageInput" accept="image/*" hidden>
+            </div>
+            <button id="clearImage" class="clear-btn" hidden>Clear Image</button>
+
+            <label class="field-label" for="promptInput">Prompt</label>
+            <textarea id="promptInput" placeholder="Describe the video you want to generate..." rows="8"></textarea>
+
+            <div class="options-grid">
+                <div class="option-group">
+                    <label class="field-label">Duration</label>
+                    <div class="range-row">
+                        <input type="range" id="duration" min="1" max="15" value="15">
+                        <span id="durationValue">15s</span>
+                    </div>
+                </div>
+                <div class="option-group">
+                    <label class="field-label" for="aspectRatio">Aspect Ratio</label>
+                    <select id="aspectRatio">
+                        <option value="auto" selected>Auto</option>
+                        <option value="1:1">1:1</option>
+                        <option value="16:9">16:9</option>
+                        <option value="9:16">9:16</option>
+                        <option value="4:3">4:3</option>
+                        <option value="3:4">3:4</option>
+                        <option value="3:2">3:2</option>
+                        <option value="2:3">2:3</option>
+                    </select>
+                </div>
+                <div class="option-group">
+                    <label class="field-label" for="resolution">Resolution</label>
+                    <select id="resolution">
+                        <option value="480p">480p</option>
+                        <option value="720p" selected>720p</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="goButton" class="go-btn">Go</button>
+        </section>
+
+        <section class="history-panel" id="historyPanel">
+            <div class="history-empty" id="historyEmpty">
+                <p>No generations yet. Create your first video!</p>
+            </div>
+        </section>
+    </main>
+    <script src="/static/app.js"></script>
+</body>
+</html>
