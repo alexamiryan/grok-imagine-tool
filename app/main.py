@@ -89,9 +89,10 @@ async def generate(req: GenerateRequest):
 
 
 @app.get("/api/generations")
-async def list_generations():
-    rows = await database.get_all_generations()
-    return rows
+async def list_generations(limit: int = 0, offset: int = 0):
+    rows = await database.get_all_generations(limit=limit, offset=offset)
+    total = await database.get_generations_count()
+    return {"items": rows, "total": total}
 
 
 @app.get("/api/generations/{gen_id}")
@@ -100,6 +101,23 @@ async def get_generation(gen_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
     return row
+
+
+@app.get("/api/generations/{gen_id}/image")
+async def get_generation_image(gen_id: int):
+    row = await database.get_generation(gen_id)
+    if not row or not row.get("source_image"):
+        raise HTTPException(status_code=404, detail="Image not found")
+    # source_image is a data URI like "data:image/png;base64,..."
+    import base64
+    data_uri = row["source_image"]
+    # Parse data URI
+    header, b64data = data_uri.split(",", 1)
+    # header is like "data:image/png;base64"
+    media_type = header.split(":")[1].split(";")[0]
+    image_bytes = base64.b64decode(b64data)
+    from fastapi.responses import Response
+    return Response(content=image_bytes, media_type=media_type)
 
 
 @app.get("/api/balance")

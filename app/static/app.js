@@ -2,6 +2,11 @@ let currentImageData = null;
 let pollTimer = null;
 let lastGenerations = [];
 
+const PAGE_SIZE = 15;
+let loadedCount = 0;
+let totalCount = 0;
+let loadingMore = false;
+
 // === DOM Elements ===
 const dropZone = document.getElementById("dropZone");
 const imageInput = document.getElementById("imageInput");
@@ -110,13 +115,66 @@ goButton.addEventListener("click", async () => {
 });
 
 // === History ===
+
+// Refresh only the currently loaded items (for polling status updates)
 async function refreshHistory() {
     try {
-        const resp = await fetch("/api/generations");
-        const generations = await resp.json();
+        const limit = loadedCount > 0 ? loadedCount : PAGE_SIZE;
+        const resp = await fetch(`/api/generations?limit=${limit}&offset=0`);
+        const data = await resp.json();
+        totalCount = data.total;
+        const generations = data.items;
+        loadedCount = generations.length;
         renderHistory(generations);
     } catch (err) {
         console.error("Failed to refresh history:", err);
+    }
+}
+
+// Load the next page and append
+async function loadMore() {
+    if (loadingMore || loadedCount >= totalCount) return;
+    loadingMore = true;
+    showLoadingIndicator(true);
+    try {
+        const resp = await fetch(`/api/generations?limit=${PAGE_SIZE}&offset=${loadedCount}`);
+        const data = await resp.json();
+        totalCount = data.total;
+        const newItems = data.items;
+        if (newItems.length === 0) return;
+
+        // Append new cards
+        for (const gen of newItems) {
+            const card = document.createElement("div");
+            card.className = "history-card";
+            card.dataset.status = gen.status;
+            card.dataset.id = String(gen.id);
+            card.innerHTML = buildCardHtml(gen);
+            historyPanel.appendChild(card);
+        }
+
+        lastGenerations = lastGenerations.concat(newItems);
+        loadedCount = lastGenerations.length;
+    } catch (err) {
+        console.error("Failed to load more:", err);
+    } finally {
+        loadingMore = false;
+        showLoadingIndicator(false);
+    }
+}
+
+function showLoadingIndicator(show) {
+    let el = document.getElementById("loadMoreSpinner");
+    if (show) {
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "loadMoreSpinner";
+            el.className = "load-more-spinner";
+            el.innerHTML = '<div class="spinner"></div>';
+            historyPanel.appendChild(el);
+        }
+    } else if (el) {
+        el.remove();
     }
 }
 
@@ -143,8 +201,8 @@ function buildCardHtml(gen) {
         mainContent = `<div class="card-error">${escapeHtml(gen.error_message || gen.status)}</div>`;
     }
 
-    const thumbHtml = gen.source_image
-        ? `<img src="${escapeAttr(gen.source_image)}" class="card-thumb" data-gen-id="${gen.id}" title="Click to use this image">`
+    const thumbHtml = gen.has_source_image
+        ? `<img src="/api/generations/${gen.id}/image" class="card-thumb" data-gen-id="${gen.id}" title="Click to use this image" loading="lazy">`
         : "";
 
     return `<div class="card-content">
@@ -156,7 +214,7 @@ function buildCardHtml(gen) {
 }
 
 function renderHistory(generations) {
-    if (generations.length === 0) {
+    if (generations.length === 0 && totalCount === 0) {
         historyEmpty.hidden = false;
         return;
     }
@@ -179,17 +237,14 @@ function renderHistory(generations) {
         const prev = prevById.get(genId);
 
         if (existing && prev && prev.status === gen.status) {
-            // No change — reuse the existing DOM node as-is
             fragment.appendChild(existing);
             existingById.delete(genId);
         } else if (existing && prev && prev.status !== gen.status) {
-            // Status changed — update inner content only
             existing.dataset.status = gen.status;
             existing.innerHTML = buildCardHtml(gen);
             fragment.appendChild(existing);
             existingById.delete(genId);
         } else {
-            // New card
             const card = document.createElement("div");
             card.className = "history-card";
             card.dataset.status = gen.status;
@@ -199,17 +254,33 @@ function renderHistory(generations) {
         }
     }
 
-    // Remove cards that no longer exist
+    // Remove cards that are no longer in the refreshed set
     existingById.forEach((card) => card.remove());
 
-    // Replace panel content preserving scroll
     const scrollTop = historyPanel.scrollTop;
-    // Remove remaining old cards (already handled above, but clear anything left)
     historyPanel.querySelectorAll(".history-card").forEach((c) => c.remove());
     historyPanel.appendChild(fragment);
     historyPanel.scrollTop = scrollTop;
 
     lastGenerations = generations;
+}
+
+// === Infinite scroll ===
+function setupInfiniteScroll() {
+    // Desktop: history-panel scrolls independently
+    historyPanel.addEventListener("scroll", () => {
+        if (loadedCount >= totalCount) return;
+        if (historyPanel.scrollTop + historyPanel.clientHeight >= historyPanel.scrollHeight - 300) {
+            loadMore();
+        }
+    });
+    // Mobile: the whole page scrolls
+    window.addEventListener("scroll", () => {
+        if (loadedCount >= totalCount) return;
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+            loadMore();
+        }
+    });
 }
 
 // === Click handlers (event delegation) ===
@@ -297,5 +368,6 @@ refreshHistory().then(() => {
     const pending = historyPanel.querySelectorAll('.history-card[data-status="pending"]');
     if (pending.length > 0) startPolling();
 });
+setupInfiniteScroll();
 refreshBalance();
 setInterval(refreshBalance, 15000);

@@ -65,12 +65,31 @@ async def update_status(
     await _db.commit()
 
 
-async def get_all_generations() -> list[dict]:
-    cursor = await _db.execute(
-        "SELECT * FROM generations ORDER BY created_at DESC"
-    )
+_LIST_COLUMNS = (
+    "id, request_id, prompt, "
+    "CASE WHEN source_image IS NOT NULL THEN 1 ELSE 0 END AS has_source_image, "
+    "duration, aspect_ratio, resolution, status, video_filename, error_message, created_at"
+)
+
+
+async def get_all_generations(limit: int = 0, offset: int = 0) -> list[dict]:
+    if limit > 0:
+        cursor = await _db.execute(
+            f"SELECT {_LIST_COLUMNS} FROM generations ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        )
+    else:
+        cursor = await _db.execute(
+            f"SELECT {_LIST_COLUMNS} FROM generations ORDER BY created_at DESC"
+        )
     rows = await cursor.fetchall()
     return [dict(row) for row in rows]
+
+
+async def get_generations_count() -> int:
+    cursor = await _db.execute("SELECT COUNT(*) FROM generations")
+    row = await cursor.fetchone()
+    return row[0]
 
 
 async def get_generation(gen_id: int) -> dict | None:
