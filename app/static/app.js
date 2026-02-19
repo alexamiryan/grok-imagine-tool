@@ -226,41 +226,47 @@ function renderHistory(generations) {
         existingById.set(card.dataset.id, card);
     });
 
-    // Build new card list, reusing existing DOM nodes where status hasn't changed
-    const fragment = document.createDocumentFragment();
     const prevById = new Map();
     lastGenerations.forEach((g) => prevById.set(String(g.id), g));
+
+    // Update in-place: walk the new list and ensure each card is at the right position
+    let refNode = historyEmpty.nextSibling; // first card slot
 
     for (const gen of generations) {
         const genId = String(gen.id);
         const existing = existingById.get(genId);
         const prev = prevById.get(genId);
 
+        let card;
         if (existing && prev && prev.status === gen.status) {
-            fragment.appendChild(existing);
+            // No change — reuse as-is
+            card = existing;
             existingById.delete(genId);
-        } else if (existing && prev && prev.status !== gen.status) {
+        } else if (existing) {
+            // Status changed — update content
             existing.dataset.status = gen.status;
             existing.innerHTML = buildCardHtml(gen);
-            fragment.appendChild(existing);
+            card = existing;
             existingById.delete(genId);
         } else {
-            const card = document.createElement("div");
+            // New card
+            card = document.createElement("div");
             card.className = "history-card";
             card.dataset.status = gen.status;
             card.dataset.id = genId;
             card.innerHTML = buildCardHtml(gen);
-            fragment.appendChild(card);
+        }
+
+        // Ensure card is at the correct position without moving unchanged nodes
+        if (card !== refNode) {
+            historyPanel.insertBefore(card, refNode);
+        } else {
+            refNode = refNode.nextSibling;
         }
     }
 
-    // Remove cards that are no longer in the refreshed set
+    // Remove cards that are no longer in the set
     existingById.forEach((card) => card.remove());
-
-    const scrollTop = historyPanel.scrollTop;
-    historyPanel.querySelectorAll(".history-card").forEach((c) => c.remove());
-    historyPanel.appendChild(fragment);
-    historyPanel.scrollTop = scrollTop;
 
     lastGenerations = generations;
 }
@@ -354,10 +360,14 @@ async function refreshBalance() {
             balanceEl.textContent = "";
             return;
         }
-        if (data.remaining !== undefined) {
-            const dollars = (data.remaining / 100).toFixed(2);
-            balanceEl.innerHTML = `Credit: <span class="amount">$${dollars}</span>`;
+        const parts = [];
+        if (data.remaining > 0) {
+            parts.push(`Credit: <span class="amount">$${(data.remaining / 100).toFixed(2)}</span>`);
         }
+        if (data.invoice > 0) {
+            parts.push(`Invoice: <span class="amount invoice">$${(data.invoice / 100).toFixed(2)}</span>`);
+        }
+        balanceEl.innerHTML = parts.join(" &middot; ");
     } catch (err) {
         console.error("Failed to fetch balance:", err);
     }

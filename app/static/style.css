@@ -38,6 +38,10 @@ header h1 {
     font-size: 1rem;
 }
 
+.balance .amount.invoice {
+    color: #f59e0b;
+}
+
 /* Layout */
 .two-column {
     display: grid;
@@ -94,6 +98,12 @@ header h1 {
     .upload-zone {
         min-height: 80px;
         padding: 12px;
+    }
+
+    textarea,
+    select,
+    input {
+        font-size: 16px;
     }
 
     textarea {

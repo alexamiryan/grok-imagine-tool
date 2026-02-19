@@ -50,7 +50,10 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(
+        STATIC_DIR / "index.html",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -139,11 +142,15 @@ async def get_balance():
             invoice = data.get("coreInvoice", {})
             prepaid_cents = abs(int(invoice.get("prepaidCredits", {}).get("val", "0")))
             used_cents = abs(int(invoice.get("prepaidCreditsUsed", {}).get("val", "0")))
-            remaining_cents = prepaid_cents - used_cents
+            remaining_cents = max(0, prepaid_cents - used_cents)
+            invoice_cents = int(invoice.get("amountAfterVat", "0"))
+            total_cents = int(invoice.get("totalWithCorr", {}).get("val", "0"))
             return {
                 "prepaid": prepaid_cents,
                 "used": used_cents,
                 "remaining": remaining_cents,
+                "invoice": invoice_cents,
+                "total": total_cents,
             }
     except Exception as e:
         logger.error("Failed to fetch balance: %s", e)
