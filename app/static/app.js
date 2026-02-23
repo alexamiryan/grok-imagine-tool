@@ -116,15 +116,18 @@ goButton.addEventListener("click", async () => {
 
 // === History ===
 
-// Refresh only the currently loaded items (for polling status updates)
+// Refresh only the first page (for polling status updates)
 async function refreshHistory() {
     try {
-        const limit = loadedCount > 0 ? loadedCount : PAGE_SIZE;
-        const resp = await fetch(`/api/generations?limit=${limit}&offset=0`);
+        const resp = await fetch(`/api/generations?limit=${PAGE_SIZE}&offset=0`);
         const data = await resp.json();
         totalCount = data.total;
         const generations = data.items;
-        loadedCount = generations.length;
+        // On first load, set loadedCount; on subsequent polls, keep existing loadedCount
+        // so infinite scroll position is preserved
+        if (loadedCount < PAGE_SIZE) {
+            loadedCount = generations.length;
+        }
         renderHistory(generations);
     } catch (err) {
         console.error("Failed to refresh history:", err);
@@ -188,12 +191,13 @@ function buildCardHtml(gen) {
                 <span class="spinner-text">Generating video...</span>
             </div>`;
     } else if (gen.status === "done" && gen.video_filename) {
+        const videoUrl = `/api/videos/${escapeAttr(gen.video_filename)}`;
         mainContent = `
             <div class="card-video">
-                <video controls preload="metadata" src="/api/videos/${escapeAttr(gen.video_filename)}"></video>
+                <video controls preload="metadata" src="${videoUrl}"></video>
             </div>
             <div class="card-actions">
-                <a href="/api/videos/${escapeAttr(gen.video_filename)}" download class="download-btn">Download</a>
+                <a href="${videoUrl}" download class="download-btn">Download</a>
             </div>`;
     } else if (gen.status === "rejected") {
         mainContent = `<div class="card-rejected">Rejected by content moderation</div>`;
@@ -306,15 +310,18 @@ historyPanel.addEventListener("click", (e) => {
 
 async function fillImageFromGeneration(genId) {
     try {
-        const resp = await fetch(`/api/generations/${genId}`);
-        const gen = await resp.json();
-        if (gen.source_image) {
-            currentImageData = gen.source_image;
+        const resp = await fetch(`/api/generations/${genId}/image`);
+        if (!resp.ok) return;
+        const blob = await resp.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            currentImageData = e.target.result;
             imagePreview.src = currentImageData;
             imagePreview.hidden = false;
             uploadPlaceholder.hidden = true;
             clearImageBtn.hidden = false;
-        }
+        };
+        reader.readAsDataURL(blob);
     } catch (err) {
         console.error("Failed to load image:", err);
     }

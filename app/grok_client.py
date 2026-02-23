@@ -94,7 +94,7 @@ async def poll_and_download(request_id: str):
 
         status = data.get("status")
         has_video = "video" in data and data["video"] and data["video"].get("url")
-        logger.info("Poll %s: status=%s has_video=%s (elapsed=%ds)", request_id, status, bool(has_video), elapsed)
+        logger.debug("Poll %s: status=%s has_video=%s (elapsed=%ds)", request_id, status, bool(has_video), elapsed)
 
         if status == "pending" and not has_video:
             continue
