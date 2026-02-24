@@ -1,6 +1,7 @@
 let currentImageData = null;
 let pollTimer = null;
 let lastGenerations = [];
+let firstPageIds = new Set();
 
 const PAGE_SIZE = 15;
 let loadedCount = 0;
@@ -156,8 +157,7 @@ async function loadMore() {
             historyPanel.appendChild(card);
         }
 
-        lastGenerations = lastGenerations.concat(newItems);
-        loadedCount = lastGenerations.length;
+        loadedCount += newItems.length;
     } catch (err) {
         console.error("Failed to load more:", err);
     } finally {
@@ -269,9 +269,13 @@ function renderHistory(generations) {
         }
     }
 
-    // Remove cards that are no longer in the set
-    existingById.forEach((card) => card.remove());
+    // Only remove cards that were part of the previous first page but dropped out.
+    // Cards from loadMore (not in firstPageIds) are left untouched.
+    existingById.forEach((card, id) => {
+        if (firstPageIds.has(id)) card.remove();
+    });
 
+    firstPageIds = new Set(generations.map(g => String(g.id)));
     lastGenerations = generations;
 }
 
